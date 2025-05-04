@@ -63,29 +63,27 @@ class PeopleCounter:
         prev_ids = set(self._prev_sides.keys())
 
         # --- Handle new objects appearing this frame ---
-        new_ids = current_ids - prev_ids
-        for objectID in new_ids:
+        for objectID in current_ids - prev_ids:
             centroid, _ = objects[objectID]
-            side = self._get_side(centroid)       # find which side it started on
+            side = self._get_side(centroid)       # which side it started on
             if side > 0:
-                # if it first appears on the “inside” side, count as entry
+                # first appears on the “inside” side → count as entry
                 self.count += 1
             # record its side for next frame
             self._prev_sides[objectID] = side
 
         # --- Handle objects that persist across frames ---
-        common_ids = current_ids & prev_ids
-        for objectID in common_ids:
+        for objectID in current_ids & prev_ids:
             centroid, _ = objects[objectID]
             side = self._get_side(centroid)       # new side
             prev = self._prev_sides[objectID]     # side last frame
             if side != prev and side != 0:
-                # if the side changed (crossed line) and not exactly on it
+                # crossed the line this frame
                 if side > prev:
-                    # moving from negative to positive = entry
+                    # moved onto “inside” → entry
                     self.count += 1
                 else:
-                    # moving from positive to negative = exit
+                    # moved onto “outside” → exit
                     self.count = max(self.count - 1, 0)
             # update stored side
             self._prev_sides[objectID] = side
@@ -93,31 +91,25 @@ class PeopleCounter:
         # --- Handle objects that disappeared this frame ---
         lost_ids = prev_ids - current_ids
         for objectID in lost_ids:
-            prev = self._prev_sides.get(objectID, 0)
-            if prev > 0:
-                # if they vanished on the “inside” side, treat as exit
-                self.count = max(self.count - 1, 0)
-            # remove from tracking
+            # simply remove from tracking history; do NOT decrement the count
             del self._prev_sides[objectID]
 
         # --- Determine whether to raise or clear the alert ---
         alert = False
         if self.count >= self.threshold and not self.alerted:
-            # threshold just reached or passed
+            # threshold reached
             alert = True
             self.alerted = True
         elif self.count < self.threshold and self.alerted:
-            # count fell below threshold after alert
+            # count fell back below threshold
             self.alerted = False
 
-        # return the updated count and whether we should show an alert
         return self.count, alert
 
 
 if __name__ == "__main__":
     # Quick demo to test the counter in isolation
     import cv2
-    from capture import test_webcam
     from detector import Detector
     from tracker import CentroidTracker
 
@@ -163,12 +155,9 @@ if __name__ == "__main__":
         # draw each tracked object's ID, centroid, and box
         for oid, (centroid, bbox) in objects.items():
             c = tuple(centroid.astype(int))
-            # small blue dot at centroid
             cv2.circle(frame, c, 4, (255, 0, 0), -1)
-            # label with ID
             cv2.putText(frame, f"ID {oid}", (c[0] - 10, c[1] - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-            # draw the bounding box in blue
             x1, y1, x2, y2 = bbox
             cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
@@ -178,6 +167,5 @@ if __name__ == "__main__":
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    # clean up resources
     cap.release()
     cv2.destroyAllWindows()
