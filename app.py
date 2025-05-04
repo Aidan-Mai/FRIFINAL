@@ -197,12 +197,21 @@ def main():
             x1, y1, x2, y2 = bbox
             cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
-        # 11. Display the frame in a window named "People Counter"
+       # 11. Display the frame
         cv2.imshow("People Counter", frame)
 
-        # 12. Exit on pressing 'q'
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        # 12. Key handling: quit on 'q', reset on 'r' or 'R'
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
             break
+        elif key in (ord('r'), ord('R')):
+            # 1) reset the occupancy count and alert flag
+            counter.count = 0
+            counter.alerted = False
+            # 2) seed internal memory so current people won't be counted again
+            #    map each visible objectID to its current side of the line
+            for objectID, (centroid, _) in objects.items():
+                counter._prev_sides[objectID] = counter._get_side(centroid)
 
     # --- CLEANUP ---
     vs.release()             # close the video stream
