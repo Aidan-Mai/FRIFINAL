@@ -52,7 +52,7 @@ def parse_args():
         help='Minimum confidence for detections (0.0 to 1.0)'
     )
     parser.add_argument(
-        '--threshold', type=int, default=5,
+        '--threshold', type=int, default=2,
         help='Number of people allowed before triggering alert'
     )
     parser.add_argument(
@@ -94,8 +94,8 @@ def preprocess_boxes(boxes, frame_shape, iou_thresh=0.3, min_area=2000):
         xB = min(a[2], b[2]); yB = min(a[3], b[3])
         interW = max(0, xB - xA); interH = max(0, yB - yA)
         interArea = interW * interH
-        unionArea = ( (a[2]-a[0])*(a[3]-a[1]) +
-                      (b[2]-b[0])*(b[3]-b[1]) - interArea )
+        unionArea = ((a[2] - a[0]) * (a[3] - a[1]) +
+                     (b[2] - b[0]) * (b[3] - b[1]) - interArea)
         return interArea / unionArea if unionArea > 0 else 0
 
     keep = []
@@ -130,10 +130,10 @@ def main():
     # Initialize the centroid tracker with a max disappearance tolerance
     ct = CentroidTracker(maxDisappeared=40)
 
-    # Define the counting line endpoints from parsed arguments
-    line = ((args.line[1], args.line[0]), (args.line[3], args.line[2]))
+    center_x = args.width // 2
+    line = ((center_x, 0), (center_x, args.height))
 
-    # Initialize the PeopleCounter with the line and occupancy threshold
+    # Initialize the PeopleCounter with the new centered line
     counter = PeopleCounter(line=line, threshold=args.threshold)
 
     # Open the video stream (webcam or file)
@@ -172,8 +172,8 @@ def main():
         cv2.putText(frame, f"Count: {count}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-        # 9. If threshold exceeded, flash a red alert on/off
-        if alert:
+        # 9. If in alerted state, flash a red alert on/off continuously
+        if counter.alerted:
             cycle = time.time() % CYCLE_DURATION
             if cycle < BLINK_ON_DURATION:
                 h, w = frame.shape[:2]
@@ -197,7 +197,7 @@ def main():
             x1, y1, x2, y2 = bbox
             cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
-       # 11. Display the frame
+        # 11. Display the frame
         cv2.imshow("People Counter", frame)
 
         # 12. Key handling: quit on 'q', reset on 'r' or 'R'
@@ -209,7 +209,6 @@ def main():
             counter.count = 0
             counter.alerted = False
             # 2) seed internal memory so current people won't be counted again
-            #    map each visible objectID to its current side of the line
             for objectID, (centroid, _) in objects.items():
                 counter._prev_sides[objectID] = counter._get_side(centroid)
 
